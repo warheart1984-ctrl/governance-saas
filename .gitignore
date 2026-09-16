@@ -4,3 +4,11 @@ __pycache__/
 venv/
 .env
 governance.db
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.pytest_cache/
+.mypy_cache/
+dist/
+build/

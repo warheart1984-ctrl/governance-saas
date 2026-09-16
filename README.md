@@ -1,5 +1,11 @@
 # Governance SaaS — Constitutional Core
 
+> Prototype and predecessor to [Voss Standalone](https://github.com/warheart1984-ctrl/voss-standalone). This repository demonstrates constitutional policy evaluation, replay, and audit concepts; it is not a production security boundary.
+
+## Status
+
+This is an experimental reference implementation. Authentication, multi-tenant isolation, immutable audit storage, and production operations remain roadmap items here. Do not deploy the included API as a production service without adding those controls.
+
 An early constitutional-governance engine for modeling, evaluating, replaying, and auditing governed decisions across connected organizational controls.
 
 ## Problem
