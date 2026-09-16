@@ -107,7 +107,7 @@ def init_db():
         request_id TEXT NOT NULL,
         node_id TEXT,
         policy_id TEXT NOT NULL,
-        policy_version TEXT NOT NOT NULL,
+        policy_version TEXT NOT NULL,
         policy_hash TEXT NOT NULL,
         engine_version TEXT NOT NULL,
         engine_hash TEXT NOT NULL,
