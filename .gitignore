@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyd
+venv/
+.env
+governance.db
