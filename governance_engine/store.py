@@ -68,6 +68,59 @@ def init_db():
         timestamp TEXT NOT NULL,
         details TEXT
     );
+    CREATE TABLE IF NOT EXISTS policies (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS policy_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        policy_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        version TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        content TEXT,
+        status TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        activated_at TEXT,
+        retired_at TEXT,
+        UNIQUE(policy_id, version)
+    );
+    CREATE TABLE IF NOT EXISTS evidence_artifacts (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        node_id TEXT,
+        source TEXT NOT NULL,
+        classification TEXT,
+        retention_until TEXT,
+        integrity_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        metadata TEXT
+    );
+    CREATE TABLE IF NOT EXISTS decisions (
+        decision_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        node_id TEXT,
+        policy_id TEXT NOT NULL,
+        policy_version TEXT NOT NOT NULL,
+        policy_hash TEXT NOT NULL,
+        engine_version TEXT NOT NULL,
+        engine_hash TEXT NOT NULL,
+        input_hash TEXT NOT NULL,
+        output_hash TEXT,
+        status TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        governance_cost REAL,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        finalized_at TEXT,
+        findings TEXT
+    );
     """)
     conn.commit()
     conn.close()
@@ -119,5 +172,43 @@ def log_audit_event(tenant_id: str, event_type: str, actor_id: str, timestamp: s
     INSERT INTO audit_events(tenant_id,event_type,actor_id,decision_id,request_id,policy_id,policy_version,policy_hash,engine_version,engine_hash,input_hash,output_hash,reason_code,timestamp,details)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (tenant_id, event_type, actor_id, decision_id, request_id, policy_id, policy_version, policy_hash, engine_version, engine_hash, input_hash, output_hash, reason_code, timestamp, details))
+    conn.commit()
+    conn.close()
+
+def create_policy(tenant_id: str, policy_id: str, name: str, description: str = "", created_at: str = None):
+    from datetime import datetime, timezone
+    ts = created_at or datetime.now(timezone.utc).isoformat()
+    conn = get_conn()
+    conn.execute("INSERT INTO policies(id,tenant_id,name,description,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                 (policy_id, tenant_id, name, description, ts, ts))
+    conn.commit()
+    conn.close()
+
+def create_policy_version(tenant_id: str, policy_id: str, version: str, content_hash: str, content: str = "", status: str = "draft", created_by: str = "system", created_at: str = None):
+    from datetime import datetime, timezone
+    ts = created_at or datetime.now(timezone.utc).isoformat()
+    conn = get_conn()
+    conn.execute("INSERT INTO policy_versions(policy_id,tenant_id,version,content_hash,content,status,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                 (policy_id, tenant_id, version, content_hash, content, status, created_by, ts))
+    conn.commit()
+    conn.close()
+
+def save_evidence_artifact(tenant_id: str, artifact_id: str, node_id: str = None, source: str = "", classification: str = "", retention_until: str = None, integrity_hash: str = "", created_at: str = None, metadata: str = None):
+    from datetime import datetime, timezone
+    ts = created_at or datetime.now(timezone.utc).isoformat()
+    conn = get_conn()
+    conn.execute("INSERT INTO evidence_artifacts(id,tenant_id,node_id,source,classification,retention_until,integrity_hash,created_at,metadata) VALUES(?,?,?,?,?,?,?,?,?)",
+                 (artifact_id, tenant_id, node_id, source, classification, retention_until, integrity_hash, ts, metadata))
+    conn.commit()
+    conn.close()
+
+def create_decision(tenant_id: str, decision_id: str, request_id: str, policy_id: str, policy_version: str, policy_hash: str, engine_version: str, engine_hash: str, input_hash: str, status: str, outcome: str, created_by: str, created_at: str = None, node_id: str = None, governance_cost: float = None, findings: str = None):
+    from datetime import datetime, timezone
+    ts = created_at or datetime.now(timezone.utc).isoformat()
+    conn = get_conn()
+    conn.execute("""
+    INSERT INTO decisions(decision_id,tenant_id,request_id,node_id,policy_id,policy_version,policy_hash,engine_version,engine_hash,input_hash,status,outcome,governance_cost,created_by,created_at,findings)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (decision_id, tenant_id, request_id, node_id, policy_id, policy_version, policy_hash, engine_version, engine_hash, input_hash, status, outcome, governance_cost, created_by, ts, findings))
     conn.commit()
     conn.close()
