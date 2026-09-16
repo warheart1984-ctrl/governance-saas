@@ -125,7 +125,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_node(node_id: str, state: NodeState, tenant_id: str = "default", node_type: str = "decision", label: str = "", owner: str = "", tags: str = ""):
+def save_node(node_id: str, state: NodeState, node_type: str = "decision", label: str = "", owner: str = "", tags: str = "", tenant_id: str = "default"):
     conn = get_conn()
     conn.execute("""
     INSERT INTO nodes(id,tenant_id,type,label,risk,ambiguity,evidence,compliance,trust,jurisdiction,owner,tags,updated_at)
@@ -146,17 +146,17 @@ def load_nodes(tenant_id: str = "default") -> Dict[str, NodeState]:
     conn.close()
     return {r["id"]: NodeState(r["risk"],r["ambiguity"],r["evidence"],r["compliance"],r["trust"],r["jurisdiction"]) for r in rows}
 
-def log_run(run_id: str, before: float, after: float, eta: float, timestamp: str):
+def log_run(run_id: str, before: float, after: float, eta: float, timestamp: str, tenant_id: str = "default"):
     conn = get_conn()
-    conn.execute("INSERT INTO runs VALUES(?,?,?,?,?)", (run_id, timestamp, before, after, eta))
+    conn.execute("INSERT INTO runs(run_id,tenant_id,timestamp,global_cost_before,global_cost_after,eta) VALUES(?,?,?,?,?,?)", (run_id, tenant_id, timestamp, before, after, eta))
     conn.commit()
     conn.close()
 
-def log_history(run_id: str, timestamp: str, states: Dict[str, NodeState]):
+def log_history(run_id: str, timestamp: str, states: Dict[str, NodeState], tenant_id: str = "default"):
     conn = get_conn()
     for nid, s in states.items():
-        conn.execute("""INSERT INTO history(node_id,run_id,timestamp,risk,ambiguity,evidence,compliance,trust,jurisdiction)
-        VALUES(?,?,?,?,?,?,?,?,?)""", (nid, run_id, timestamp, s.r, s.a, s.e, s.c, s.t, s.j))
+        conn.execute("""INSERT INTO history(node_id,tenant_id,run_id,timestamp,risk,ambiguity,evidence,compliance,trust,jurisdiction)
+        VALUES(?,?,?,?,?,?,?,?,?,?)""", (nid, tenant_id, run_id, timestamp, s.r, s.a, s.e, s.c, s.t, s.j))
     conn.commit()
     conn.close()
 
@@ -183,6 +183,21 @@ def create_policy(tenant_id: str, policy_id: str, name: str, description: str = 
                  (policy_id, tenant_id, name, description, ts, ts))
     conn.commit()
     conn.close()
+
+def get_decision(decision_id: str, tenant_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM decisions WHERE decision_id=? AND tenant_id=?", (decision_id, tenant_id)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def list_audit_events(tenant_id: str, event_type: str = None):
+    conn = get_conn()
+    if event_type:
+        rows = conn.execute("SELECT * FROM audit_events WHERE tenant_id=? AND event_type=? ORDER BY id DESC", (tenant_id, event_type)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM audit_events WHERE tenant_id=? ORDER BY id DESC", (tenant_id,)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 def create_policy_version(tenant_id: str, policy_id: str, version: str, content_hash: str, content: str = "", status: str = "draft", created_by: str = "system", created_at: str = None):
     from datetime import datetime, timezone
