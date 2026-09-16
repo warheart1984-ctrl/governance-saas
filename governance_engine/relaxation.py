@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Dict, List
 from .core import NodeState, Weights, derivatives, clamp
 
-def nightly_relaxation(
+def propose_relaxation(
     states: Dict[str, NodeState],
     neighbors: Dict[str, List[str]],
     couplings: Dict[str, Dict[str, float]],
@@ -14,9 +14,10 @@ def nightly_relaxation(
     eta: float = 0.01,
 ) -> Dict[str, NodeState]:
     """
-    Perform one relaxation step in-place and return updated states.
+    Compute relaxation proposal without mutating original states.
+    Returns proposed states for human approval.
     """
-    new_states: Dict[str, NodeState] = {}
+    proposed: Dict[str, NodeState] = {}
     for nid, state in states.items():
         nbr_ids = neighbors.get(nid, [])
         nbr_states = []
@@ -34,10 +35,22 @@ def nightly_relaxation(
         t = clamp(state.t - eta * d_t)
         jv = clamp(state.j - eta * d_j)
 
-        new_states[nid] = NodeState(r, a, e, c, t, jv)
+        proposed[nid] = NodeState(r, a, e, c, t, jv)
+    return proposed
 
-    # commit
-    states.update(new_states)
+def nightly_relaxation(
+    states: Dict[str, NodeState],
+    neighbors: Dict[str, List[str]],
+    couplings: Dict[str, Dict[str, float]],
+    weights: Weights,
+    eta: float = 0.01,
+) -> Dict[str, NodeState]:
+    """
+    Perform one relaxation step in-place and return updated states.
+    Deprecated for production use: use propose_relaxation + explicit approval.
+    """
+    proposed = propose_relaxation(states, neighbors, couplings, weights, eta)
+    states.update(proposed)
     return states
 
 def global_cost(states: Dict[str, NodeState], neighbors: Dict[str, List[str]], couplings: Dict[str, Dict[str, float]], weights: Weights) -> float:

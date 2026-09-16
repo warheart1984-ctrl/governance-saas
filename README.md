@@ -1,6 +1,12 @@
 # Governance SaaS — Constitutional Core
 
-This is a minimal, buyer-ready implementation of the Governance SaaS described in the spec.
+An early constitutional-governance engine for modeling, evaluating, replaying, and auditing governed decisions across connected organizational controls.
+
+## Problem
+Organizations cannot reliably trace how policy, evidence, authority, and exceptions produced a decision.
+
+## Approach
+Versioned policy checks plus graph-aware governance evaluation and replayable audit records.
 
 ## Architecture
 Frontend → Governance Console → Intent Router → Constitutional Chain (JCK/JCR/CAR/CDR/CEL/CPE) → Verification & Replay → Audit Ledger
@@ -25,7 +31,14 @@ FastAPI skeleton at `api_server.py`:
 - POST /api/governance/relax
 - GET /api/governance/cost
 
-## Next steps
-- Add persistence, history, failure surface map
-- Add Temporal Replay Timeline UI
-- Package acquisition pitch
+## Current scope
+Prototype core, FastAPI endpoints, relaxation demo, and replay UI concept.
+
+## Production roadmap
+- Authentication, tenant isolation, RBAC/ABAC
+- Policy lifecycle: versioning, validation, review, approval, activation, rollback
+- Immutable audit ledger with input/output hashes
+- Deterministic constitutional rule evaluation
+- Evidence model with provenance and integrity
+- Exceptions workflow
+- Operational controls: migrations, structured logs, metrics, backups, incident/rollback

@@ -18,6 +18,7 @@ def init_db():
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS nodes (
         id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
         type TEXT,
         label TEXT,
         risk REAL, ambiguity REAL, evidence REAL, compliance REAL, trust REAL, jurisdiction REAL,
@@ -28,12 +29,14 @@ def init_db():
     CREATE TABLE IF NOT EXISTS edges (
         source TEXT,
         target TEXT,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
         coupling REAL,
         relation TEXT,
-        PRIMARY KEY(source,target)
+        PRIMARY KEY(source,target,tenant_id)
     );
     CREATE TABLE IF NOT EXISTS runs (
         run_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
         timestamp TEXT,
         global_cost_before REAL,
         global_cost_after REAL,
@@ -42,31 +45,51 @@ def init_db():
     CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         node_id TEXT,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
         run_id TEXT,
         timestamp TEXT,
         risk REAL, ambiguity REAL, evidence REAL, compliance REAL, trust REAL, jurisdiction REAL
+    );
+    CREATE TABLE IF NOT EXISTS audit_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor_id TEXT NOT NULL,
+        decision_id TEXT,
+        request_id TEXT,
+        policy_id TEXT,
+        policy_version TEXT,
+        policy_hash TEXT,
+        engine_version TEXT,
+        engine_hash TEXT,
+        input_hash TEXT,
+        output_hash TEXT,
+        reason_code TEXT,
+        timestamp TEXT NOT NULL,
+        details TEXT
     );
     """)
     conn.commit()
     conn.close()
 
-def save_node(node_id: str, state: NodeState, node_type: str = "decision", label: str = "", owner: str = "", tags: str = ""):
+def save_node(node_id: str, state: NodeState, tenant_id: str = "default", node_type: str = "decision", label: str = "", owner: str = "", tags: str = ""):
     conn = get_conn()
     conn.execute("""
-    INSERT INTO nodes(id,type,label,risk,ambiguity,evidence,compliance,trust,jurisdiction,owner,tags,updated_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+    INSERT INTO nodes(id,tenant_id,type,label,risk,ambiguity,evidence,compliance,trust,jurisdiction,owner,tags,updated_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?, ?,datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
+        tenant_id=excluded.tenant_id,
         type=excluded.type, label=excluded.label,
         risk=excluded.risk, ambiguity=excluded.ambiguity, evidence=excluded.evidence,
         compliance=excluded.compliance, trust=excluded.trust, jurisdiction=excluded.jurisdiction,
         owner=excluded.owner, tags=excluded.tags, updated_at=datetime('now')
-    """, (node_id, node_type, label, state.r, state.a, state.e, state.c, state.t, state.j, owner, tags))
+    """, (node_id, tenant_id, node_type, label, state.r, state.a, state.e, state.c, state.t, state.j, owner, tags))
     conn.commit()
     conn.close()
 
-def load_nodes() -> Dict[str, NodeState]:
+def load_nodes(tenant_id: str = "default") -> Dict[str, NodeState]:
     conn = get_conn()
-    rows = conn.execute("SELECT id,risk,ambiguity,evidence,compliance,trust,jurisdiction FROM nodes").fetchall()
+    rows = conn.execute("SELECT id,risk,ambiguity,evidence,compliance,trust,jurisdiction FROM nodes WHERE tenant_id=?", (tenant_id,)).fetchall()
     conn.close()
     return {r["id"]: NodeState(r["risk"],r["ambiguity"],r["evidence"],r["compliance"],r["trust"],r["jurisdiction"]) for r in rows}
 
@@ -84,8 +107,17 @@ def log_history(run_id: str, timestamp: str, states: Dict[str, NodeState]):
     conn.commit()
     conn.close()
 
-def get_history(node_id: str) -> List[Dict]:
+def get_history(node_id: str, tenant_id: str = "default") -> List[Dict]:
     conn = get_conn()
-    rows = conn.execute("SELECT timestamp,run_id,risk,ambiguity,evidence,compliance,trust,jurisdiction FROM history WHERE node_id=? ORDER BY timestamp", (node_id,)).fetchall()
+    rows = conn.execute("SELECT timestamp,run_id,risk,ambiguity,evidence,compliance,trust,jurisdiction FROM history WHERE node_id=? AND tenant_id=? ORDER BY timestamp", (node_id, tenant_id)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def log_audit_event(tenant_id: str, event_type: str, actor_id: str, timestamp: str, decision_id: str = None, request_id: str = None, policy_id: str = None, policy_version: str = None, policy_hash: str = None, engine_version: str = None, engine_hash: str = None, input_hash: str = None, output_hash: str = None, reason_code: str = None, details: str = None):
+    conn = get_conn()
+    conn.execute("""
+    INSERT INTO audit_events(tenant_id,event_type,actor_id,decision_id,request_id,policy_id,policy_version,policy_hash,engine_version,engine_hash,input_hash,output_hash,reason_code,timestamp,details)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (tenant_id, event_type, actor_id, decision_id, request_id, policy_id, policy_version, policy_hash, engine_version, engine_hash, input_hash, output_hash, reason_code, timestamp, details))
+    conn.commit()
+    conn.close()
